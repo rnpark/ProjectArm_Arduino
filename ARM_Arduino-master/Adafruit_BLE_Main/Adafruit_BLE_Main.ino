@@ -478,6 +478,7 @@ void loadOffsets_1()
 	sensors_event_t event;
 	bno1.getEvent(&event);
 	if (foundCalib) {
+    //magnetometer still needs to be calibrated even when loading previous calibration data
 		Serial.println("Move sensor slightly to calibrate magnetometers");
 		while (!bno1.isFullyCalibrated())
 		{
@@ -532,6 +533,7 @@ void loadOffsets_1()
 	Serial.println("Data stored to EEPROM.");
 
 	Serial.println("\n--------------------------------\n");
+  //caculate offsets for location of calibratino data for next sensor
   eeAddress += sizeof(newCalib);
 	delay(500);
 }
@@ -643,6 +645,7 @@ void loadOffsets_2()
 	Serial.println("Data stored to EEPROM.");
 
 	Serial.println("\n--------------------------------\n");
+  //calculate offsets for location of calibration data for next sensor
   eeAddress += sizeof(newCalib);
   Serial.print("eeaddress: ");
   Serial.println(eeAddress);
@@ -751,6 +754,7 @@ void loadOffsets_3()
 	Serial.println("Data stored to EEPROM.");
 
 	Serial.println("\n--------------------------------\n");
+ //calculate offsets for location of calibration data for next sensor
 	eeAddress += sizeof(calibrationData);
 	delay(500);
 }
@@ -848,27 +852,36 @@ void loop(void)
 	{
 
 	// Get Quaternion data (no 'Gimbal Lock' like with Euler angles)
-
+    //It should be noted that the x axis is heading
+    //y axis is roll
+    //and z axis is pitch
 
 		tcaselect(1);
+   //Get quaternion data from reference sensor
 		imu::Quaternion quat2 = bno2.getQuat();
 		// Send abbreviated integer data out over BLE UART
+    //always make sure to normalize the quaternions
     quat2.normalize();
     
-    /*float temp2 = quat2.x();
+    /*frame change, swaps x and y axes
+    float temp2 = quat2.x();
     quat2.x() = quat2.y();
     quat2.y() = temp2;
     quat2.z() = -quat2.z();
     */
+    //convert to Euler for output to phone
     imu::Vector<3> euler2 = quat2.toEuler();
+    //convert to rotation matrix for calculations
     imu::Matrix<3> matrix2 = quat2.toMatrix();
-    
+
+    //output to phone
     ble.print("AT+BLEUARTTXF=");
     ble.print("RF");
     ble.print(-180/M_PI * euler2.x(), 1);
     ble.print(-180/M_PI * euler2.y(), 1);
     ble.println(-180/M_PI * euler2.z(), 1);
 
+    //output to serial 
     Serial.print("Reference sensor: ");
     Serial.print("X: ");
     Serial.print(-180/M_PI * euler2.x(), 1);
@@ -876,7 +889,7 @@ void loop(void)
     Serial.print(-180/M_PI * euler2.y(), 1);
     Serial.print(", Z: ");
     Serial.println(-180/M_PI * euler2.z(), 1);
-    /*
+    /*for sending quaternions to phone
 		ble.print("AT+BLEUARTTXF=");
 		ble.print("Rw");
 		ble.print(quat.w(), 4);
@@ -903,12 +916,14 @@ void loop(void)
 		Serial.print(", ");
 		Serial.print("Z: ");
 		Serial.println(quat2.z(), 4);
-    
+
+    //Get quaternions from shoulder sensor
     tcaselect(0);
 	  imu::Quaternion quat1 = bno1.getQuat();
 	  // Send abbreviated integer data out over BLE UART
+    //normalize
     quat1.normalize();
-    /*
+    /*frame change, swaps x and y axes
     float temp1 = quat1.x();
     quat1.x() = -quat1.y();
     quat1.y() = temp1;
@@ -919,17 +934,20 @@ void loop(void)
     imu::Matrix<3> matrix1Inverse = matrix1.invert();
     imu::Matrix<3> transform1 = matrix2*matrix1Inverse;
     imu::Quaternion trans;
+    //covert back to quaternion
     trans.fromMatrix(transform1);
     trans.normalize();
+    //covert to euler for ouput to phone
     imu::Vector<3> euler1 = trans.toEuler();
    
-   
+    //output to phone
     ble.print("AT+BLEUARTTXF=");
     ble.print("MA");
     ble.print(-180/M_PI * euler1.x(), 1);
     ble.print(-180/M_PI * euler1.y(), 1);
     ble.println(-180/M_PI * euler1.z(), 1);
-    
+
+    //output to serial
     Serial.print("Shoulder sensor: ");
     Serial.print("X: ");
     Serial.print(-180/M_PI * euler1.x(), 1);
@@ -937,7 +955,7 @@ void loop(void)
     Serial.print(-180/M_PI * euler1.y(), 1);
     Serial.print(", Z: ");
     Serial.println(-180/M_PI * euler1.z(), 1);
-    /*
+    /*for sending quaternions to phone
   	ble.print("AT+BLEUARTTXF=");
   	ble.print("Sw");
   	ble.print(quat.w(), 4);
@@ -976,7 +994,8 @@ void loop(void)
     Serial.print(", Z: ");
     Serial.println(trans.z(), 4);
     
-  
+
+    //get quaternions from wrist sensor
   	tcaselect(2);
   	imu::Quaternion quat3 = bno3.getQuat();
   	// Send abbreviated integer data out over BLE UART
@@ -988,22 +1007,26 @@ void loop(void)
     imu::Matrix<3> matrix2Inverse = matrix3.invert();
     imu::Matrix<3> transform2 = matrix2*matrix2Inverse;
     imu::Quaternion trans2;
+    //convert back to quaternion
     trans2.fromMatrix(transform2);
     trans2.normalize();
-    /*
+    /*frame change, swaps x and y axes
     float temp3 = quat3.x();
     quat3.x() = -quat3.y();
     quat3.y() = temp3;
     quat3.z() = -quat3.z();
     */
+    //convert to Euler for output to phone
     imu::Vector<3> euler3 = trans2.toEuler();
-    
+
+    //output to phone
     ble.print("AT+BLEUARTTXF=");
     ble.print("EX");
     ble.print(-180/M_PI * euler3.x(), 1);
     ble.print(-180/M_PI * euler3.y(), 1);
     ble.println(-180/M_PI * euler3.z(), 1);
-    
+
+    //output to serial
     Serial.print("Elbow sensor: ");
     Serial.print("X: ");
     Serial.print(-180/M_PI * euler3.x(), 1);
@@ -1012,7 +1035,7 @@ void loop(void)
     Serial.print(", Z: ");
     Serial.println(-180/M_PI * euler3.z(), 1);
 
-    /*
+    /*for sending quaternions to the phone
   	ble.print("AT+BLEUARTTXF=");
   	ble.print("Ew");
   	ble.print(quat.w(), 4);
